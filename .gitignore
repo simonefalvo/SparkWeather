@@ -121,3 +121,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# Spark content
+*.zip
+
+# Pycharm
+.idea
