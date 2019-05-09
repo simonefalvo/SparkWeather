@@ -5,6 +5,9 @@ import Constants
 
 
 # TODO: controllare come si comporta con i campi vuoti
+from pyspark.sql import SparkSession
+
+
 def generateTuple(line, cities):
     '''
     :param line: csv line
@@ -47,6 +50,17 @@ def evaluateDay(elementList):
     return n_k, sky_clear
     # return k, [sky_clear, sky_not_clear]
 
+def getRDDFromCSV(sc, nameFile):
+    rawWeather = sc.textFile(nameFile)
+
+    # Header RDD
+    weatherHeader = rawWeather.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
+    cities = weatherHeader.collect()
+    del cities[0]
+
+    return rawWeather, weatherHeader, cities
+
+
 
 
 
@@ -56,14 +70,13 @@ def main():
 
     print(datetime.datetime.now())
 
-    '''  read data '''
+    rawWeather, weatherHeader, cities = getRDDFromCSV(sc, Constants.WEATHER_DESCRIPTION_FILE)
 
-    rawWeather= sc.textFile(Constants.WEATHER_DESCRIPTION_FILE)
-
-    # Header RDD
+    
     weatherHeader = rawWeather.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
     cities = weatherHeader.collect()
     del cities[0]
+
 
     '''
         @input: rdd contenente le righe del file csv
@@ -74,14 +87,17 @@ def main():
                         .subtract(weatherHeader) \
                         .filter(lambda l: re.search('^\d{4}-03|^\d{4}-04|^\d{4}-05', l)) # month filter
 
-    print("after month filter: ", weatherDescription.take(5))
 
     '''
         @input: rdd contenente le righe del file csv dei soli mesi di interesse
         @output: genera per ogni rdd più tuple (citta anno-mese, weather desript)        
+        
+        gli elementi dell'rdd sono una tupla di stringa, lista del tipo
+          ('Philadelphia 2013-04-01', 'sky is clear, scattered clouds ecc')
+        
+        
     '''
-    # gli elementi dell'rdd sono una tupla di
-    # stringa, lista del tipo  ('Philadelphia 2013-04-01', 'sky is clear, scattered clouds ecc')
+    #
     daysOfMonth = weatherDescription \
                  .flatMap(lambda line: generateTuple(line, cities)) \
 
@@ -91,12 +107,23 @@ def main():
     '''
         @input: tuple del tipo (citta anno-mese, weather description)
         @output: tuple del tipo (citta anno-mese, num di giorni valutati come sereni)
+        
+        transform each value into a list
+        combine lists: ([1,2,3] + [4,5]) becomes [1,2,3,4,5]7
+        In questo modo evitiamo una groupByKey meno efficente
     '''
-    daysOfMonthHaveSkyClear = daysOfMonth \
-                             .groupByKey()\
-                             .mapValues(list).map(evaluateDay)
 
-    print("after evaluate day: ", daysOfMonthHaveSkyClear.take(15))
+    daysOfMonthWithWeather = daysOfMonth \
+                            .map(lambda nameTuple: (nameTuple[0], [nameTuple[1]])) \
+                            .reduceByKey(lambda a, b: a + b)
+
+
+    daysOfMonthHaveSkyClear = daysOfMonthWithWeather \
+                            .map(evaluateDay)
+
+    print("after evaluate day: ", daysOfMonthHaveSkyClear.take(12))
+
+
 
     '''
         @input: tuple del tipo (citta anno-mese, num di giorni valutati come sereni)
@@ -108,14 +135,19 @@ def main():
 
     print("after treshold filter: ", resultQuery.take(15))
 
-    # (city yyyy-mm, #gg sky_is_clear) -> (city yyyy, mm) -> (citta_anno, [ elenco mesi] )
-    #  -> elenco citta tre mesi sky clear -> elenco citta anno
     '''
         @input: tuple del tipo (citta anno-mese, num di giorni valutati come sereni >15)
         @output: tuple del tipo (anno, lista di citta che hanno registrato nei 3 mesi almeno 15 giorni sereni)
+        
+        Trasforma le coppie (Citta anno-mese, #ggSereno) in (Citta Anno, [mese] )
+        Riduce per chiave (citta anno, lista mesi )
+        Seleziona le coppie che hanno 3 mesi nella lista
+        Genera le coppie (anno, [citta]) e li riduce per chiave
+        Infine li ordina per chiave (anno) e li stampa
+        
     '''
-    printableResult = resultQuery.map(lambda t: (t[0][:-3], t[0][-2:])).groupByKey().mapValues(list) \
-        .filter(lambda t: len(t[1]) == 3).map(lambda t: (t[0][-4:], t[0][:-5])).groupByKey().mapValues(list) \
+    printableResult = resultQuery.map(lambda t: (t[0][:-3], [ t[0][-2:] ])).reduceByKey(lambda a, b: a + b) \
+        .filter(lambda t: len(t[1]) == 3).map(lambda t: (t[0][-4:], [t[0][:-5]] )).reduceByKey(lambda a, b: a + b) \
         .sortByKey().collect()
 
     print(printableResult)
