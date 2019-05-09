@@ -51,17 +51,17 @@ def evaluateDay(elementList):
     # return k, [sky_clear, sky_not_clear]
 
 def getRDDFromCSV(sc, nameFile):
-    rawWeather = sc.textFile(nameFile)
+
+    fileRDD = sc.textFile(nameFile)
 
     # Header RDD
-    weatherHeader = rawWeather.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
-    cities = weatherHeader.collect()
+    weatherHeader = fileRDD.filter(lambda l: "datetime" in l)
+    cities = weatherHeader.flatMap(lambda line: line.split(",")).collect()
     del cities[0]
 
+    rawWeather = fileRDD.subtract(weatherHeader)
+
     return rawWeather, weatherHeader, cities
-
-
-
 
 
 def main():
@@ -71,11 +71,6 @@ def main():
     print(datetime.datetime.now())
 
     rawWeather, weatherHeader, cities = getRDDFromCSV(sc, Constants.WEATHER_DESCRIPTION_FILE)
-
-    
-    weatherHeader = rawWeather.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
-    cities = weatherHeader.collect()
-    del cities[0]
 
 
     '''
@@ -102,7 +97,7 @@ def main():
                  .flatMap(lambda line: generateTuple(line, cities)) \
 
 
-    print("after process month data: ", daysOfMonth.take(15))
+    # print("after process month data: ", daysOfMonth.take(15))
 
     '''
         @input: tuple del tipo (citta anno-mese, weather description)
@@ -121,7 +116,7 @@ def main():
     daysOfMonthHaveSkyClear = daysOfMonthWithWeather \
                             .map(evaluateDay)
 
-    print("after evaluate day: ", daysOfMonthHaveSkyClear.take(12))
+    # print("after evaluate day: ", daysOfMonthHaveSkyClear.take(12))
 
 
 
@@ -133,7 +128,7 @@ def main():
                 .reduceByKey(lambda x, y: x + y) \
                 .filter(lambda t: t[1] >= 15)
 
-    print("after treshold filter: ", resultQuery.take(15))
+    # print("after treshold filter: ", resultQuery.take(15))
 
     '''
         @input: tuple del tipo (citta anno-mese, num di giorni valutati come sereni >15)
