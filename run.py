@@ -48,36 +48,72 @@ def evaluateDay(elementList):
     # return k, [sky_clear, sky_not_clear]
 
 
+
+
 def main():
 
     sc = SparkContext("local", "Simple App")
 
     print(datetime.datetime.now())
 
-    rawWeather = sc.textFile(Constants.WEATHER_DESCRIPTION_FILE)
+    '''  read data '''
+
+    rawWeather= sc.textFile(Constants.WEATHER_DESCRIPTION_FILE)
 
     # Header RDD
     weatherHeader = rawWeather.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
     cities = weatherHeader.collect()
     del cities[0]
 
-    # elimina dall'rdd l'header e filtra i dati di interesse in base ai mesi
+    '''
+        @input: rdd contenente le righe del file csv
+        @output: rdd contenente le righe del file csv dei soli mesi di interesse
+         elimina dall'rdd l'header e filtra i dati di interesse in base ai mesi   
+    '''
     weatherDescription = rawWeather \
-        .subtract(weatherHeader) \
-        .filter(lambda l: re.search('^\d{4}-03|^\d{4}-04|^\d{4}-05', l)) # month filter
+                        .subtract(weatherHeader) \
+                        .filter(lambda l: re.search('^\d{4}-03|^\d{4}-04|^\d{4}-05', l)) # month filter
+
     print("after month filter: ", weatherDescription.take(5))
 
-    # gli elementi dell'rdd sono una tupla di stringa, lista ('Philadelphia 2013-04-01', 'sky is clear, scattered clouds ecc')
-    daysOfMonthHaveSkyClear= weatherDescription.flatMap(lambda line: generateTuple(line, cities)) \
-        .groupByKey().mapValues(list).map(evaluateDay)
+    '''
+        @input: rdd contenente le righe del file csv dei soli mesi di interesse
+        @output: genera per ogni rdd più tuple (citta anno-mese, weather desript)        
+    '''
+    # gli elementi dell'rdd sono una tupla di
+    # stringa, lista del tipo  ('Philadelphia 2013-04-01', 'sky is clear, scattered clouds ecc')
+    daysOfMonth = weatherDescription \
+                 .flatMap(lambda line: generateTuple(line, cities)) \
+
+
+    print("after process month data: ", daysOfMonth.take(15))
+
+    '''
+        @input: tuple del tipo (citta anno-mese, weather description)
+        @output: tuple del tipo (citta anno-mese, num di giorni valutati come sereni)
+    '''
+    daysOfMonthHaveSkyClear = daysOfMonth \
+                             .groupByKey()\
+                             .mapValues(list).map(evaluateDay)
+
     print("after evaluate day: ", daysOfMonthHaveSkyClear.take(15))
 
-    resultQuery = daysOfMonthHaveSkyClear.reduceByKey(lambda x, y: x + y) \
-        .filter(lambda t: t[1] >= 15)
+    '''
+        @input: tuple del tipo (citta anno-mese, num di giorni valutati come sereni)
+        @output: restituisce le citta che hanno piu di 15 gg del dato mese di tempo sereno
+    '''
+    resultQuery = daysOfMonthHaveSkyClear\
+                .reduceByKey(lambda x, y: x + y) \
+                .filter(lambda t: t[1] >= 15)
+
     print("after treshold filter: ", resultQuery.take(15))
 
     # (city yyyy-mm, #gg sky_is_clear) -> (city yyyy, mm) -> (citta_anno, [ elenco mesi] )
     #  -> elenco citta tre mesi sky clear -> elenco citta anno
+    '''
+        @input: tuple del tipo (citta anno-mese, num di giorni valutati come sereni >15)
+        @output: tuple del tipo (anno, lista di citta che hanno registrato nei 3 mesi almeno 15 giorni sereni)
+    '''
     printableResult = resultQuery.map(lambda t: (t[0][:-3], t[0][-2:])).groupByKey().mapValues(list) \
         .filter(lambda t: len(t[1]) == 3).map(lambda t: (t[0][-4:], t[0][:-5])).groupByKey().mapValues(list) \
         .sortByKey().collect()
