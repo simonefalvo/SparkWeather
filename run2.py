@@ -2,9 +2,31 @@ from pyspark import SparkContext
 import statistics
 import json
 import Constants
+import utils.locutils
+
+'''
+    @input: header di altro file contenente elenco citta (es file temperature.csv), spark context
+    @output: lista di elementi del tipo: Stato ; Citta
+'''
+
+def generateKey(cities, sc):
+
+    cityDatas = sc.textFile(Constants.CITY_ATTRIBUTES_FILE)
+    header = cityDatas.filter(lambda l: "Latitude" in l)
+
+    cityInfo = cityDatas.subtract(header).map(lambda line: (line.split(",")[0], line.split(",")[1:]) )\
+                .map(lambda myTuple: utils.locutils.country(float(myTuple[1][0]), float(myTuple[1][1])) +\
+                                      " ; "+myTuple[0])
+
+    cityInfoD = cityInfo.collect()
+    print(cityInfoD)
+
+    return cityInfoD
 
 
-def generateTupleWithIndex(line, cities):
+
+
+def generateTupleWithIndex(line, cities, tipoChiave):
 
     mylist = []
     date = line[0:10]
@@ -16,20 +38,35 @@ def generateTupleWithIndex(line, cities):
 
     for city in cities:
 
-        k = city+' '+date
         '''
-            non gestisco l'else poichè la casistica di errori non è prevedibili
-                - valori senza virgola
-                - valori con virgola ma cmq fuori range
-                - valori fuori range 
+            La nuova chiave è: 
+                per la query 2 lo stato
+                per la query 3 la citta e lo stato
+            
         '''
+        if tipoChiave == 1:
+            k = city+' '+date
+        else:
+            k = city.split(";")[0]+' '+date
 
         try:
             temp = float(temperature[i].strip())
+            ''' provo a recuperare il dato con virgola mancante
+                ricostruito il dato controllo che sia in range 
+            '''
+            if temp > Constants.MAX_TEMPERATURE:
+                #print("pre processing = "+str(temp))
+                temp = temperature[i].strip()
+                temp = temp[:3]+'.'+temp[4:]
+                temp = float(temp)
+                #print("after processing = " + str(temp))
+
             if temp < Constants.MAX_TEMPERATURE and temp > Constants.MIN_TEMPERATURE:
                 v = temp
                 t = (k, (h, v))
                 mylist.append(t)
+
+
 
         except ValueError:
             print("error float conv")
@@ -49,7 +86,7 @@ def correctErrors(myList):
 
     # caso di lista con un solo elemento
     if len(myList) == 1:
-        print("Unica misurazione")
+        #print("Unica misurazione")
         v = float(myList[0][1])
         for i in range(0,24):
             finalList.append(v)
@@ -122,10 +159,19 @@ def main():
     cites = temperatureHeader.collect()
     del cites[0]
 
+    cites = generateKey(cites, sc)
+
+    #exit()
+
+    ''''
+        dal file csv in formato rdd ne rimuove l'header e ne genera delle tuple
+        
+    
+    '''
     # calcola rdd con elenco di 12 temperature, eventualmente ricavate, di ogni giorno di ogni città
     temperature = rddFileTemperature. \
                                     subtract(temperatureHeader). \
-                                    flatMap(lambda line: generateTupleWithIndex(line, cites)).\
+                                    flatMap(lambda line: generateTupleWithIndex(line, cites,2)).\
                                     groupByKey(). \
                                     mapValues(list)
 
