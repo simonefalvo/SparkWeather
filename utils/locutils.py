@@ -39,6 +39,11 @@ if __name__ == '__main__':
     # San Francisco
     sflat = 37.77
     sflng = -122.419
+    # Detroit
+    # Google: 42.4206146 -83.7472549
+    dlat = 42.331429
+    dlng = -83.045753
+
 
     print(country(jlat, jlng))
     print(utcoffset(jlat, jlng))
@@ -48,3 +53,7 @@ if __name__ == '__main__':
 
     print(country(sflat, sflng))
     print(utcoffset(sflat, sflng))
+
+    print(country(dlat, dlng))
+    print(utcoffset(dlat, dlng))
+
