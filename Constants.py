@@ -7,3 +7,6 @@ HUMIDITY_FILE = dir + "/data/humidity.csv"
 PRESSURE_FILE = dir + "/data/pressure.csv"
 TEMPERATURE_FILE = dir + "/data/temperature.csv"
 WEATHER_DESCRIPTION_FILE = dir + "/data/weather_description.csv"
+
+MAX_TEMPERATURE = 330
+MIN_TEMPERATURE = 220

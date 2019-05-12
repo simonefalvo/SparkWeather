@@ -5,7 +5,6 @@ import Constants
 
 
 # TODO: controllare come si comporta con i campi vuoti
-from pyspark.sql import SparkSession
 
 
 def generateTuple(line, cities):
@@ -19,11 +18,9 @@ def generateTuple(line, cities):
     descriptions = line.split(",")
     del descriptions[0]             # remove non-description info
 
-    i=0
-    for city in cities:
-        t = (city + ' ' + date, descriptions[i])
+    for idx, city in enumerate(cities):
+        t = (city + ' ' + date, descriptions[idx])
         mylist.append(t)
-        i = i+1
 
     return mylist
 
@@ -92,7 +89,7 @@ def main():
         
         
     '''
-    #
+
     daysOfMonth = weatherDescription \
                  .flatMap(lambda line: generateTuple(line, cities)) \
 
