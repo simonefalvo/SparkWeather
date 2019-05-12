@@ -1,202 +1,245 @@
 from pyspark import SparkContext
 import statistics
 import json
+import datetime
 import Constants
 import utils.locutils
 
+debug = True
+
 '''
-    @input: header di altro file contenente elenco citta (es file temperature.csv), spark context
-    @output: lista di elementi del tipo: Stato ; Citta
+    @input: spark context
+    @output: preleva le citta dal file e genera lista di elementi del tipo: Stato ; Citta 
 '''
 
-def generateKey(cities, sc):
+
+def generateStateFromCity(sc):
 
     cityDatas = sc.textFile(Constants.CITY_ATTRIBUTES_FILE)
     header = cityDatas.filter(lambda l: "Latitude" in l)
 
-    cityInfo = cityDatas.subtract(header).map(lambda line: (line.split(",")[0], line.split(",")[1:]) )\
-                .map(lambda myTuple: utils.locutils.country(float(myTuple[1][0]), float(myTuple[1][1])) +\
-                                      " ; "+myTuple[0])
+    cityInfo = cityDatas\
+        .subtract(header)\
+        .map(lambda line: (line.split(",")[0], line.split(",")[1:]) )\
+        .map(lambda myTuple: utils.locutils.country(float(myTuple[1][0]),
+                                                    float(myTuple[1][1])) + " ; "+myTuple[0])
 
     cityInfoD = cityInfo.collect()
-    print(cityInfoD)
-
     return cityInfoD
 
 
+'''
+    @input: Riga del file csv, 
+            lista delle citta, nel formato "Nazione ; Città"
+            tipoChiave, specifica se nell'output si vuole solo la città (valore 1) o la nazione e la citta
+    
+    @output: lista di tuple del tipo (chiave, (ora, temperatura))
+            Chiave a seconda di tipoChiave sarà     "Nazione ; Citta Data"
+                                           oppure   "Citta Data"
+    
+    Durante il processo si cerca di correggere eventuali errori nel campo temperatura (inserimento punto) e 
+    si validano controllando che rientrino in un range di validità 
 
-
-def generateTupleWithIndex(line, cities, tipoChiave):
+'''
+def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_min, dotPosition):
 
     mylist = []
     date = line[0:10]
     temperature = line.split(",")
     del temperature[0]
 
-    i=0
+    i = 0
     h = line[11:13]
 
     for city in cities:
 
-        '''
-            La nuova chiave è: 
-                per la query 2 lo stato
-                per la query 3 la citta e lo stato
-            
-        '''
         if tipoChiave == 1:
             k = city+' '+date
-        else:
+        else: # """ probabilmente non lo usero mai """
             k = city.split(";")[0]+' '+date
 
         try:
             temp = float(temperature[i].strip())
-            ''' provo a recuperare il dato con virgola mancante
-                ricostruito il dato controllo che sia in range 
-            '''
-            if temp > Constants.MAX_TEMPERATURE:
-                #print("pre processing = "+str(temp))
-                temp = temperature[i].strip()
-                temp = temp[:3]+'.'+temp[4:]
-                temp = float(temp)
-                #print("after processing = " + str(temp))
+            # print("temperatura da dataset = " + str(temp))
 
-            if temp < Constants.MAX_TEMPERATURE and temp > Constants.MIN_TEMPERATURE:
-                v = temp
-                t = (k, (h, v))
+            # provo a recuperare il dato con virgola mancante
+            if temp > val_max:
+                tmp = temperature[i].strip()
+                tmp = tmp[:dotPosition]+'.'+tmp[(dotPosition+1):]
+                temp = float(tmp)
+
+            if temp in range(val_min, val_max):
+                t = (k, (h, temp))
                 mylist.append(t)
 
-
+            i = i + 1
 
         except ValueError:
-            print("error float conv")
-
-        i = i+1
+            i = i + 1
+            #print("error converting in float:"+temperature[i]+".")
 
     return mylist
 
+
 # _ | _ | 23 | 23 | _ | 24
-def correctErrors(myList):
-    #ordino i dati in base all'ora (chiave delle tuple)
+def fillEmptyData(my_list):
 
-    myList.sort()
-   # print(myList)
-    firstTime = True
-    finalList = []
+    N = 24
 
-    # caso di lista con un solo elemento
-    if len(myList) == 1:
-        #print("Unica misurazione")
-        v = float(myList[0][1])
-        for i in range(0,24):
-            finalList.append(v)
+    my_list = [(int(k), v) for k, v in my_list]
+    my_list.sort()
 
-    # o ho dati corretti oppure ho dei buchi
-    else:
-       for item in myList:
+    final_list = []
 
-            if firstTime:
-                s = item
-                v = float(s[1])
-                # se il primo elemento non e' dell'informazione oraria mezza notte propago il primo dato fino al primo ho
-                if int(s[0]) > 0:
-                    # propago il primo valore che ho nei buchi orari precedenti
-                    #print("Propago valore "+str(int(s[0]))+" volte ")
-                    for n in range(0, int(s[0]), 1):
-                        # finalList.append((n, v))
-                        finalList.append(v)
+    k_prev, v_prev = my_list[0][0] - 1, my_list[0][1]   # go to if k == k_prev + 1: at first run
 
-                # archivio il valore attuale nella lista finale
-                finalList.append(float(s[1]))
-                firstTime = False
+    # lost first data
+    if my_list[0][0] != 0:
+        for i in range(0, k_prev+1):
+            final_list.append(v_prev)
 
-            else:
-                # l'info oraria che possiedo e' consecutiva
-                v = float(item[1])
-                if int(s[0])+1 == int(item[0]):
-                    s = item
-                    # finalList.append((int(item[0]), item[1]))
-                    finalList.append(v)
-                else:  # se gli elementi non sono consecutivi
+    for my_tuple in my_list:
+        k, v = my_tuple
 
-                    v = (float(s[1]) + float(item[1]))/2
-                    #print("Propago media " + str(int(item[0])-int(s[0]))+" volte ")
-                    for n in range(int(s[0])+1, int(item[0]), 1):
-                        # finalList.append((n, v))
-                        finalList.append(v)
+        if k == k_prev + 1:  # consecutive data
+            final_list.append(v)
 
-                    # finalList.append((int(item[0]), item[1]))
-                    finalList.append(v)
-                    s = item
+        if k > k_prev + 1:  # no consecutive data
+            avg = (v_prev + v)/2
+            for i in range(k_prev, k-1):
+                final_list.append(avg)
 
-    return finalList
+            final_list.append(v)
 
-''' la media, la deviazione standard, il minimo, il massimo '''
+        if k == my_list[-1][0] and k < N:  # lost last data
+            for i in range(k+1, N):
+                final_list.append(v)
+
+        k_prev, v_prev = k, v
+
+    return final_list
 
 
 def computeStatisticsOfMonth(myList):
 
     monthStatistics = {
-        "avg" : statistics.mean(myList),
-        "max" : max(myList),
-        "min" : min(myList),
-        "std" : statistics.stdev(myList)
+        "avg": statistics.mean(myList),
+        "max": max(myList),
+        "min": min(myList),
+        "std": statistics.stdev(myList)
     }
     return monthStatistics
 
 
+def query2(sc, file, val_max, val_min, dotPosition):
+
+    rddFileData = sc.textFile(file)
+
+    ''' ottieni header del file, ovvero elenco citta  '''
+    dataHeader = rddFileData\
+        .filter(lambda l: "datetime" in l)
+
+    cites = generateStateFromCity(sc)
+
+
+    ''''
+        @input: file intero in formato RDD
+        @output: tuple del tipo ( Stato ; Citta aaaa-mm-gg , [(ora, temperatura)...]
+        
+        calcola rdd con elenco delle temperature (al piu 12) di ogni giorno di ogni città
+        
+    '''
+    #togliere sortbykey(?), mi serve in fase di test
+
+    data = rddFileData \
+        .subtract(dataHeader) \
+        .flatMap(lambda line: generateTupleWithHoursAndCorrectData(line, cites, 1,
+                                                                   val_max, val_min, dotPosition)) \
+        .groupByKey() \
+        .sortByKey() \
+        .mapValues(list)
+
+    '''
+                                    reduceByKey(lambda x,y: x+y ).\
+                                    sortByKey()
+
+    '''
+    if debug:
+        print("prima stampa")
+        print(data.take(10))
+        print("fine prima stampa")
+
+    '''
+        Inserisce le misurazioni orarie giornaliere mancanti        
+    '''
+
+    fixedData = data.mapValues(fillEmptyData)
+
+    if debug:
+        print("seconda stampa")
+        print(fixedData.take(2))
+        print("fine seconda stampa")
+
+    '''
+        @Input: Tuple del tipo (Stato ; citta aaa-mm-gg, Liste di temperature
+        @Output: Per ogni stato, per ogni mese tuple del tipo
+                 (Stato aaaa-mm , statistiche)
+
+        Con la map genero le nuove chiavi lasciando inalterato il contenuto
+    '''
+    # raggruppa per stato e mese
+    dataMonth = fixedData \
+        .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[1][-10:-3], t[1])) \
+        .reduceByKey(lambda x, y: x + y) \
+        .mapValues(list) \
+        .mapValues(computeStatisticsOfMonth) \
+        .sortByKey()
+
+    result = dataMonth.collect()
+    if debug:
+        print("terza stampa")
+        print(result)
+
+    return result
+
 
 def main():
-    ''' Temperature '''
-    # Analiziamo statistica di ogni citta per poi aggregarle per stato
 
     sc = SparkContext("local", "Query 2")
 
-    rddFileTemperature = sc.textFile(Constants.TEMPERATURE_FILE)
+    print(datetime.datetime.now())
 
-    ''' ottieni header del file, ovvero elenco citta di cui ho i dati '''
-    temperatureHeader = rddFileTemperature.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
-    cites = temperatureHeader.collect()
-    del cites[0]
+    resultTemp = query2(sc,
+                        Constants.TEMPERATURE_FILE,
+                        Constants.MAX_TEMPERATURE,
+                        Constants.MIN_TEMPERATURE,
+                        Constants.POINT_WHERE_CUT_TEMP)
 
-    cites = generateKey(cites, sc)
+    resultHum = query2(sc,
+                       Constants.HUMIDITY_FILE,
+                       Constants.MAX_HUMIDITY,
+                       Constants.MIN_HUMIDITY,
+                       Constants.POINT_WHERE_CUT_HUM)
+    resultPress = query2(sc,
+                         Constants.PRESSURE_FILE,
+                         Constants.MAX_PRESSURE,
+                         Constants.MIN_PRESSURE,
+                         Constants.POINT_WHERE_CUT_PRES)
 
-    #exit()
-
-    ''''
-        dal file csv in formato rdd ne rimuove l'header e ne genera delle tuple
-        
-    
-    '''
-    # calcola rdd con elenco di 12 temperature, eventualmente ricavate, di ogni giorno di ogni città
-    temperature = rddFileTemperature. \
-                                    subtract(temperatureHeader). \
-                                    flatMap(lambda line: generateTupleWithIndex(line, cites,2)).\
-                                    groupByKey(). \
-                                    mapValues(list)
-
-    print ("prima stampa")
-    print(temperature.take(10))
-
-
-    fixedTemperature = temperature.mapValues(correctErrors)
-
-    print("seconda stampa")
-    print(fixedTemperature.take(1))
-
-    # raggruppa per citta e mese
-    temperatureMonth = fixedTemperature.\
-                                    map(lambda t: (t[0][:-3], t[1])).\
-                                    reduceByKey(lambda x, y: x+y).\
-                                    mapValues(list).\
-                                    mapValues(computeStatisticsOfMonth)
-
-    ''' todo: prima di computare le statistiche aggregare per nazione'''
-
-    file = open("output.txt", "w")
-    file.write(json.dumps(temperatureMonth.collect()))
+    file = open("output_temp.json", "w")
+    file.write(json.dumps(resultTemp))
     file.close()
-    #print(temperatureMonth.collect())
+
+    file = open("output_hum.json", "w")
+    file.write(json.dumps(resultHum))
+    file.close()
+
+    file = open("output_press.json", "w")
+    file.write(json.dumps(resultPress))
+    file.close()
+
+    print(datetime.datetime.now())
+
 
 if __name__ == '__main__':
     main()
