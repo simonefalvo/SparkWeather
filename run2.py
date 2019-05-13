@@ -69,7 +69,7 @@ def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_
                 temp = float(tmp)
 
             if temp in range(val_min, val_max):
-                t = (k, (h, temp))
+                t = (k, [(h, temp)])
                 mylist.append(t)
 
             i = i + 1
@@ -149,15 +149,13 @@ def query2(sc, file, val_max, val_min, dotPosition):
         calcola rdd con elenco delle temperature (al piu 12) di ogni giorno di ogni città
         
     '''
-    #togliere sortbykey(?), mi serve in fase di test
+
 
     data = rddFileData \
         .subtract(dataHeader) \
         .flatMap(lambda line: generateTupleWithHoursAndCorrectData(line, cites, 1,
                                                                    val_max, val_min, dotPosition)) \
-        .groupByKey() \
-        .sortByKey() \
-        .mapValues(list)
+        .reduceByKey(lambda x, y: x+y)
 
     '''
                                     reduceByKey(lambda x,y: x+y ).\
@@ -188,10 +186,10 @@ def query2(sc, file, val_max, val_min, dotPosition):
         Con la map genero le nuove chiavi lasciando inalterato il contenuto
     '''
     # raggruppa per stato e mese
+    # TODO: togliere sortbykey, mi serve in fase di test per avere output ordinato
     dataMonth = fixedData \
         .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[1][-10:-3], t[1])) \
         .reduceByKey(lambda x, y: x + y) \
-        .mapValues(list) \
         .mapValues(computeStatisticsOfMonth) \
         .sortByKey()
 
@@ -215,28 +213,34 @@ def main():
                         Constants.MIN_TEMPERATURE,
                         Constants.POINT_WHERE_CUT_TEMP)
 
+    file = open("output_temp.json", "w")
+    file.write(json.dumps(resultTemp))
+    file.close()
+    del resultTemp
+
     resultHum = query2(sc,
                        Constants.HUMIDITY_FILE,
                        Constants.MAX_HUMIDITY,
                        Constants.MIN_HUMIDITY,
                        Constants.POINT_WHERE_CUT_HUM)
+
+    file = open("output_hum.json", "w")
+    file.write(json.dumps(resultHum))
+    file.close()
+    del resultHum
+
     resultPress = query2(sc,
                          Constants.PRESSURE_FILE,
                          Constants.MAX_PRESSURE,
                          Constants.MIN_PRESSURE,
                          Constants.POINT_WHERE_CUT_PRES)
 
-    file = open("output_temp.json", "w")
-    file.write(json.dumps(resultTemp))
-    file.close()
 
-    file = open("output_hum.json", "w")
-    file.write(json.dumps(resultHum))
-    file.close()
 
     file = open("output_press.json", "w")
     file.write(json.dumps(resultPress))
     file.close()
+    del resultPress
 
     print(datetime.datetime.now())
 
