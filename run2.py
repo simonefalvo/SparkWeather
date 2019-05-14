@@ -5,7 +5,7 @@ import datetime
 import Constants
 import utils.locutils
 
-debug = True
+debug = False
 
 '''
     @input: spark context
@@ -21,8 +21,11 @@ def generateStateFromCity(sc):
     cityInfo = cityDatas\
         .subtract(header)\
         .map(lambda line: (line.split(",")[0], line.split(",")[1:]) )\
-        .map(lambda myTuple: utils.locutils.country(float(myTuple[1][0]),
-                                                    float(myTuple[1][1])) + " ; "+myTuple[0])
+        .map(lambda myTuple: utils.locutils.country(float(myTuple[1][0]), float(myTuple[1][1]))
+                             + " ; " + myTuple[0]
+                             + " ; " + utils.locutils.get_timezone(float(myTuple[1][0]), float(myTuple[1][1])))
+
+
 
     cityInfoD = cityInfo.collect()
     return cityInfoD
@@ -41,22 +44,27 @@ def generateStateFromCity(sc):
     si validano controllando che rientrino in un range di validità 
 
 '''
-def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_min, dotPosition):
+def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_min, dotPosition, utc_convert):
 
     mylist = []
-    date = line[0:10]
+    date = line[0:19]
     temperature = line.split(",")
     del temperature[0]
-
     i = 0
-    h = line[11:13]
 
     for city in cities:
+        if utc_convert:
+            date_offset = utils.locutils.convert_timezone(date, city.split(";")[2])
+            h = date_offset[11:13]
+            date_offset = date_offset[0:10]
+        else:
+            h = date[11:13]
+            date_offset = date[0:10]
 
         if tipoChiave == 1:
-            k = city+' '+date
+            k = city+' '+date_offset
         else: # """ probabilmente non lo usero mai """
-            k = city.split(";")[0]+' '+date
+            k = city.split(";")[0]+' '+date_offset
 
         try:
             temp = float(temperature[i].strip())
@@ -150,12 +158,11 @@ def query2(sc, file, val_max, val_min, dotPosition):
         
     '''
 
-
     data = rddFileData \
         .subtract(dataHeader) \
         .flatMap(lambda line: generateTupleWithHoursAndCorrectData(line, cites, 1,
-                                                                   val_max, val_min, dotPosition)) \
-        .reduceByKey(lambda x, y: x+y)
+                                                                   val_max, val_min, dotPosition, True)) \
+        .reduceByKey(lambda x, y: x+y)\
 
     '''
                                     reduceByKey(lambda x,y: x+y ).\
@@ -190,8 +197,8 @@ def query2(sc, file, val_max, val_min, dotPosition):
     dataMonth = fixedData \
         .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[1][-10:-3], t[1])) \
         .reduceByKey(lambda x, y: x + y) \
-        .mapValues(computeStatisticsOfMonth) \
-        .sortByKey()
+        .mapValues(computeStatisticsOfMonth) # \
+        #.sortByKey()
 
     result = dataMonth.collect()
     if debug:
@@ -204,8 +211,8 @@ def query2(sc, file, val_max, val_min, dotPosition):
 def main():
 
     sc = SparkContext("local", "Query 2")
-
-    print(datetime.datetime.now())
+    start = datetime.datetime.now()
+    print(start)
 
     resultTemp = query2(sc,
                         Constants.TEMPERATURE_FILE,
@@ -242,7 +249,9 @@ def main():
     file.close()
     del resultPress
 
-    print(datetime.datetime.now())
+    end = datetime.datetime.now()
+    print(end)
+    print(end-start)
 
 
 if __name__ == '__main__':
