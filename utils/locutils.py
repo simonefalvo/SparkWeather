@@ -1,6 +1,8 @@
 from pytz import timezone
+import pytz
 from timezonefinder import TimezoneFinder
-from datetime import datetime
+from _datetime import datetime
+
 import reverse_geocode
 
 tf = TimezoneFinder(in_memory=True)
@@ -21,11 +23,29 @@ def utcoffset(lat, lng):
     """
     target = dict({'lat': lat, 'lng': lng})
     tz_target = timezone(tf.certain_timezone_at(lat=target['lat'], lng=target['lng']))
-    # print("target timezone: ", tz_target)
+
+    print("target timezone: ", tz_target)
     # ATTENTION: tz_target could be None! handle error case
     today_target = tz_target.localize(datetime.now())
     offset = today_target.strftime('%z')[0:3]       # +/-HHMM
     return int(offset)
+
+def get_timezone(lat, lng):
+    """
+        returns a location's time zone.
+    """
+    target = dict({'lat': lat, 'lng': lng})
+    tz_target = timezone(tf.certain_timezone_at(lat=target['lat'], lng=target['lng']))
+    return str(tz_target)
+
+def convert_timezone(my_date, my_timezone):
+
+    my_struct_date = datetime.strptime(my_date, "%Y-%m-%d %H:%M:%S")
+    utc_date = pytz.utc.localize(my_struct_date)
+    timezone_date = utc_date.astimezone(pytz.timezone(my_timezone.strip()))
+
+    return str(timezone_date)[0:19]
+
 
 
 if __name__ == '__main__':
@@ -44,7 +64,6 @@ if __name__ == '__main__':
     dlat = 42.331429
     dlng = -83.045753
 
-
     print(country(jlat, jlng))
     print(utcoffset(jlat, jlng))
 
@@ -56,4 +75,3 @@ if __name__ == '__main__':
 
     print(country(dlat, dlng))
     print(utcoffset(dlat, dlng))
-
