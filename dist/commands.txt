@@ -34,7 +34,7 @@ kafka-avro-console-producer \
 
 CONNECT TOPICS
 
-kafka-topics --create --topic quickstart-config --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
-kafka-topics --create --topic quickstart-status --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
-kafka-topics --create --topic quickstart-offsets --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
-kafka-topics --create --topic quickstart-data --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
+kafka-topics --create --topic connect-config --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
+kafka-topics --create --topic connect-status --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
+kafka-topics --create --topic connect-offsets --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
+kafka-topics --create --topic connect-data --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:2181
