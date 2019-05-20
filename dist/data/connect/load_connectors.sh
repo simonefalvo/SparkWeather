@@ -1,4 +1,5 @@
 #!/bin/bash
 
-cp /data/connect-myfile-source.properties /connectors
-cp /data/connect-myhdfs.properties /connectors
+connect-standalone /data/connect-standalone.properties \
+    /data/connect-myfile-source.properties \
+    /data/connect-myhdfs.properties
