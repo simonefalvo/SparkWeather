@@ -1,11 +1,11 @@
 from pyspark import SparkContext
 import statistics
-import json
 import datetime
 import Constants
 import utils.locutils
+import time
 
-debug = False
+debug = True
 
 '''
     @input: spark context
@@ -13,22 +13,21 @@ debug = False
 '''
 
 
-def generateStateFromCity(sc):
+def generate_state_from_city(sc):
 
-    cityDatas = sc.textFile(Constants.CITY_ATTRIBUTES_FILE)
-    header = cityDatas.filter(lambda l: "Latitude" in l)
+    city_datas = sc.textFile(Constants.CITY_ATTRIBUTES_FILE)
+    header = city_datas.filter(lambda l: "Latitude" in l)
 
-    cityInfo = cityDatas\
+    city_info = city_datas\
         .subtract(header)\
-        .map(lambda line: (line.split(",")[0], line.split(",")[1:]) )\
-        .map(lambda myTuple: utils.locutils.country(float(myTuple[1][0]), float(myTuple[1][1]))
-                             + " ; " + myTuple[0]
-                             + " ; " + utils.locutils.get_timezone(float(myTuple[1][0]), float(myTuple[1][1])))
+        .map(lambda line: (line.split(",")[0], line.split(",")[1:]))\
+        .map(lambda my_tuple: utils.locutils.country(float(my_tuple[1][0]), float(my_tuple[1][1]))
+                             + " ; " + my_tuple[0]
+                             + " ; " + utils.locutils.get_timezone(float(my_tuple[1][0]), float(my_tuple[1][1])))
 
+    city_info_d = city_info.collect()
 
-
-    cityInfoD = cityInfo.collect()
-    return cityInfoD
+    return city_info_d
 
 
 '''
@@ -44,9 +43,11 @@ def generateStateFromCity(sc):
     si validano controllando che rientrino in un range di validità 
 
 '''
-def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_min, dotPosition, utc_convert):
 
-    mylist = []
+
+def generate_tuple_with_hours_utc(line, cities, key_type, val_max, val_min, utc_convert):
+
+    my_list = []
     date = line[0:19]
     temperature = line.split(",")
     del temperature[0]
@@ -61,24 +62,19 @@ def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_
             h = date[11:13]
             date_offset = date[0:10]
 
-        if tipoChiave == 1:
+        if key_type == 1:
             k = city+' '+date_offset
-        else: # """ probabilmente non lo usero mai """
+        else:  # """ probabilmente non lo usero mai """
             k = city.split(";")[0]+' '+date_offset
 
         try:
             temp = float(temperature[i].strip())
             # print("temperatura da dataset = " + str(temp))
 
-            # provo a recuperare il dato con virgola mancante
-            if temp > val_max:
-                tmp = temperature[i].strip()
-                tmp = tmp[:dotPosition]+'.'+tmp[(dotPosition+1):]
-                temp = float(tmp)
-
             if temp in range(val_min, val_max):
-                t = (k, [(h, temp)])
-                mylist.append(t)
+                # t = (k, [(h, temp)])
+                t = (k, [temp])
+                my_list.append(t)
 
             i = i + 1
 
@@ -86,7 +82,18 @@ def generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_
             i = i + 1
             #print("error converting in float:"+temperature[i]+".")
 
-    return mylist
+    return my_list
+
+
+def compute_statistics_of_month(my_list):
+
+    month_statistics = {
+        "avg": statistics.mean(my_list),
+        "max": max(my_list),
+        "min": min(my_list),
+        "std": statistics.stdev(my_list)
+    }
+    return month_statistics
 
 
 # _ | _ | 23 | 23 | _ | 24
@@ -128,27 +135,18 @@ def fillEmptyData(my_list):
     return final_list
 
 
-def computeStatisticsOfMonth(myList):
-
-    monthStatistics = {
-        "avg": statistics.mean(myList),
-        "max": max(myList),
-        "min": min(myList),
-        "std": statistics.stdev(myList)
-    }
-    return monthStatistics
 
 
-def query2(sc, file, val_max, val_min, dotPosition):
 
-    rddFileData = sc.textFile(file)
+def query2(sc, file_in_name, val_max, val_min, file_out_name):
+
+    rdd_file_data = sc.textFile(file_in_name)
 
     ''' ottieni header del file, ovvero elenco citta  '''
-    dataHeader = rddFileData\
+    data_header = rdd_file_data\
         .filter(lambda l: "datetime" in l)
 
-    cites = generateStateFromCity(sc)
-
+    cites = generate_state_from_city(sc)
 
     ''''
         @input: file intero in formato RDD
@@ -158,12 +156,10 @@ def query2(sc, file, val_max, val_min, dotPosition):
         
     '''
 
-    data = rddFileData \
-        .subtract(dataHeader) \
-        .flatMap(lambda line: generateTupleWithHoursAndCorrectData(line, cites, 1,
-                                                                   val_max, val_min, dotPosition, True)) \
-        .reduceByKey(lambda x, y: x+y)\
-
+    data = rdd_file_data \
+        .subtract(data_header) \
+        .flatMap(lambda line: generate_tuple_with_hours_utc(line, cites, 1, val_max, val_min, True)) \
+        .reduceByKey(lambda x, y: x+y)
     '''
                                     reduceByKey(lambda x,y: x+y ).\
                                     sortByKey()
@@ -175,17 +171,6 @@ def query2(sc, file, val_max, val_min, dotPosition):
         print("fine prima stampa")
 
     '''
-        Inserisce le misurazioni orarie giornaliere mancanti        
-    '''
-
-    fixedData = data.mapValues(fillEmptyData)
-
-    if debug:
-        print("seconda stampa")
-        print(fixedData.take(2))
-        print("fine seconda stampa")
-
-    '''
         @Input: Tuple del tipo (Stato ; citta aaa-mm-gg, Liste di temperature
         @Output: Per ogni stato, per ogni mese tuple del tipo
                  (Stato aaaa-mm , statistiche)
@@ -194,13 +179,20 @@ def query2(sc, file, val_max, val_min, dotPosition):
     '''
     # raggruppa per stato e mese
     # TODO: togliere sortbykey, mi serve in fase di test per avere output ordinato
-    dataMonth = fixedData \
-        .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[1][-10:-3], t[1])) \
+    data_month = data \
+        .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[2][-10:-3], t[1]))
+    print("seconda stampa")
+    print(data_month.take(10))
+    print("fine seconda stampa")
+
+    statistics_data = data_month\
         .reduceByKey(lambda x, y: x + y) \
-        .mapValues(computeStatisticsOfMonth) # \
+        .mapValues(compute_statistics_of_month)  # \
         #.sortByKey()
 
-    result = dataMonth.collect()
+    statistics_data.saveAsTextFile(file_out_name)
+
+    result = statistics_data.collect()
     if debug:
         print("terza stampa")
         print(result)
@@ -214,40 +206,40 @@ def main():
     start = datetime.datetime.now()
     print(start)
 
-    resultTemp = query2(sc,
+    current_milli_time = int(round(time.time() * 1000))
+    file_path = Constants.TEMPERATURE_QUERY2_OUTPUT_FILE+str(current_milli_time)+".txt"
+
+    result_temp = query2(sc,
                         Constants.TEMPERATURE_FILE,
                         Constants.MAX_TEMPERATURE,
                         Constants.MIN_TEMPERATURE,
-                        Constants.POINT_WHERE_CUT_TEMP)
+                        file_path)
 
-    file = open("output_temp.json", "w")
-    file.write(json.dumps(resultTemp))
-    file.close()
-    del resultTemp
+    del result_temp
 
-    resultHum = query2(sc,
+    exit()
+
+    current_milli_time = int(round(time.time() * 1000))
+    file_path = Constants.HUMIDITY_QUERY2_OUTPUT_FILE + str(current_milli_time) + ".txt"
+
+    result_hum = query2(sc,
                        Constants.HUMIDITY_FILE,
                        Constants.MAX_HUMIDITY,
                        Constants.MIN_HUMIDITY,
-                       Constants.POINT_WHERE_CUT_HUM)
+                       file_path)
 
-    file = open("output_hum.json", "w")
-    file.write(json.dumps(resultHum))
-    file.close()
-    del resultHum
+    del result_hum
 
-    resultPress = query2(sc,
+    current_milli_time = int(round(time.time() * 1000))
+    file_path = Constants.PRESSURE_QUERY2_OUTPUT_FILE + str(current_milli_time) + ".txt"
+
+    result_press = query2(sc,
                          Constants.PRESSURE_FILE,
                          Constants.MAX_PRESSURE,
                          Constants.MIN_PRESSURE,
-                         Constants.POINT_WHERE_CUT_PRES)
+                         file_path)
 
-
-
-    file = open("output_press.json", "w")
-    file.write(json.dumps(resultPress))
-    file.close()
-    del resultPress
+    del result_press
 
     end = datetime.datetime.now()
     print(end)
