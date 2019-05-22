@@ -5,8 +5,15 @@ dir = os.path.dirname(__file__)
 CITY_ATTRIBUTES_FILE = dir + "/data/city_attributes.csv"
 HUMIDITY_FILE = dir + "/data/humidity.csv"
 PRESSURE_FILE = dir + "/data/pressure.csv"
-TEMPERATURE_FILE = dir + "/data/temperature.csv"
+TEMPERATURE_FILE = dir + "/data/temperature_processed.csv"
 WEATHER_DESCRIPTION_FILE = dir + "/data/weather_description.csv"
+
+HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_humidity"
+PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_pressure"
+TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_temperature"
+QUERY1_OUTPUT_FILE = "hdfs://localhost:54310/topics/query1.json"
+
+
 
 MAX_TEMPERATURE = 330
 MIN_TEMPERATURE = 220
