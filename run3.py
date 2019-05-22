@@ -2,126 +2,122 @@ from pyspark import SparkContext
 import re
 import Constants
 import run2
+import datetime
 
 
-def mean_temp(rdd):
+def main():
 
-    # ("nation ; city", [t1,...,tn])
-    temp = rdd \
-        .flatMap(lambda l: generateTupleWithIndex(l, nat_cities, 1))\
-        .groupByKey()
-
-    # ("nation ; city", mean temperature)
-    return temp.map(lambda t: (t[0], sum(t[1]) / len(t[1])))
-
-# generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_min, dotPosition):
-def generateTupleWithIndex(line, cities, tipoChiave):
-    """
-    genera tuple con la chiave che non contiene la data
-    """
-
-    mylist = []
-    temperature = line.split(",")
-    del temperature[0]
-
-    i=0
-    #h = line[11:13]
-
-    for city in cities:
-
-        '''
-            La nuova chiave è: 
-                per la query 2 lo stato
-                per la query 3 la citta e lo stato
-        '''
-        if tipoChiave == 1:
-            k = city
-        else:
-            k = city.split(";")[0]
-
-        try:
-            temp = float(temperature[i].strip())
-            ''' provo a recuperare il dato con virgola mancante
-                ricostruito il dato controllo che sia in range 
-            '''
-            if temp > Constants.MAX_TEMPERATURE:
-                #print("pre processing = "+str(temp))
-                temp = temperature[i].strip()
-                temp = temp[:3]+'.'+temp[4:]
-                temp = float(temp)
-                #print("after processing = " + str(temp))
-
-            if temp < Constants.MAX_TEMPERATURE and temp > Constants.MIN_TEMPERATURE:
-                v = temp
-                t = (k,  v)
-                mylist.append(t)
-
-        except ValueError:
-            print("error float conv")
-
-        i = i+1
-
-    return mylist
-
-
-if __name__ == '__main__':
+    start = datetime.datetime.now()
 
     sc = SparkContext("local", "Simple App")
 
-    rawCSV = sc.textFile(Constants.TEMPERATURE_FILE)
+    raw_csv = sc.textFile(Constants.TEMPERATURE_FILE)
 
     # remove header
-    tempHeader = rawCSV.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
-    cities = tempHeader.collect()[1:]
-    rawtemp = rawCSV.subtract(tempHeader)
+    temp_header = raw_csv.filter(lambda l: "datetime" in l).flatMap(lambda line: line.split(","))
+    raw_temp = raw_csv.subtract(temp_header)
 
     nat_cities = run2.generate_state_from_city(sc)
+    #print(nat_cities)
 
-    # get nations' list of the involved cities
-    nations = []
+    # get countries' list of the involved cities
+    countries = []
     for nat_city in nat_cities:
-        tempNation = nat_city.split(" ; ")[0]
-        if tempNation not in nations:
-            nations.append(tempNation)
+        country = nat_city.split(" ; ")[0]
+        if country not in countries:
+            countries.append(country)
+    #print(countries)
 
-    season = rawtemp.filter(lambda l: re.search('^2017-06|^2017-07|^2017-08|^2017-09', l))
-    summerMeanTemp = mean_temp(season)  # ("nation ; city", 2017 summer mean temperature)
-    print("summer 2017 mean temperature per city: ", summerMeanTemp.take(10))
+    season = raw_temp.filter(lambda l: re.search('^2017-06|^2017-07|^2017-08|^2017-09', l))
+    summer_mean_temp = mean_temperature(season, nat_cities)  # ("country ; city", 2017 summer mean temperature)
+    #print("summer 2017 mean temperature per city: ", summer_mean_temp.take(10))
 
-    season = rawtemp.filter(lambda l: re.search('^2017-01|^2017-02|^2017-03|^2017-04', l))
-    winterMeanTemp = mean_temp(season)  # ("nation ; city", 2017 winter mean temperature)
-    print("winter 2017 mean temperature per city: ", winterMeanTemp.take(10))
+    season = raw_temp.filter(lambda l: re.search('^2017-01|^2017-02|^2017-03|^2017-04', l))
+    winter_mean_temp = mean_temperature(season, nat_cities)  # ("country ; city", 2017 winter mean temperature)
+    #print("winter 2017 mean temperature per city: ", winter_mean_temp.take(10))
 
-    # ("nation ; city", 2017 summer-winter mean temperature difference)
-    tempDiff = summerMeanTemp.join(winterMeanTemp).mapValues(lambda temps: abs(temps[0] - temps[1])).cache()
-    print("2017 temperature difference per city: ", tempDiff.take(10))
+    # ("country ; city ; tz", 2017 summer-winter mean temperature difference)
+    temp_diff = summer_mean_temp.join(winter_mean_temp).mapValues(lambda temps: abs(temps[0] - temps[1])).cache()
+    #print("2017 temperature difference per city: ", temp_diff.take(10))
 
-    season = rawtemp.filter(lambda l: re.search('^2016-06|^2017-07|^2017-08|^2017-09', l))
-    summerMeanTemp = mean_temp(season)  # ("nation ; city", 2016 summer mean temperature)
-    print("summer 2016 mean temperature per city: ", summerMeanTemp.take(10))
+    season = raw_temp.filter(lambda l: re.search('^2016-06|^2017-07|^2017-08|^2017-09', l))
+    summer_mean_temp = mean_temperature(season, nat_cities)  # ("country ; city", 2016 summer mean temperature)
+    #print("summer 2016 mean temperature per city: ", summer_mean_temp.take(10))
 
-    season = rawtemp.filter(lambda l: re.search('^2016-01|^2017-02|^2017-03|^2017-04', l))
-    winterMeanTemp = mean_temp(season)  # ("nation ; city", 2017 winter mean temperature)
-    print("winter 2016 mean temperature per city: ", winterMeanTemp.take(10))
+    season = raw_temp.filter(lambda l: re.search('^2016-01|^2017-02|^2017-03|^2017-04', l))
+    winter_mean_temp = mean_temperature(season, nat_cities)  # ("country ; city", 2017 winter mean temperature)
+    #print("winter 2016 mean temperature per city: ", winter_mean_temp.take(10))
 
-    # ("nation ; city", 2016 summer-winter mean temperature difference)
-    prevTempDiff = summerMeanTemp.join(winterMeanTemp).mapValues(lambda temps: abs(temps[0] - temps[1])).cache()
-    print("2016 temperature difference per city: ", prevTempDiff.take(10))
+    # ("country ; city", 2016 summer-winter mean temperature difference)
+    prev_temp_diff = summer_mean_temp.join(winter_mean_temp).mapValues(lambda temps: abs(temps[0] - temps[1])).cache()
+    #print("2016 temperature difference per city: ", prev_temp_diff.take(10))
 
-    for nation in nations:
-        nationTemp = tempDiff.filter(lambda value: nation in value[0])
-        prevNationTemp = prevTempDiff.filter(lambda value: nation in value[0]) \
+    for country in countries:
+        # get country's 2017 temperature differences
+        country_temp = temp_diff.filter(lambda value: country in value[0])
+        # get country's 2017 temperature differences and sort by value in ascending order
+        # producing tuples of the form ("country ; city", position)
+        prev_country_temp = prev_temp_diff.filter(lambda value: country in value[0]) \
             .sortBy(keyfunc=lambda x: x[1], ascending=False) \
             .map(lambda x: x[0]) \
             .zipWithIndex()
-        tempChart = nationTemp.join(prevNationTemp).takeOrdered(15, lambda x: -x[1][0])
+        temp_chart = country_temp.join(prev_country_temp).takeOrdered(15, lambda x: -x[1][0])
         # TODO: ridurre l'rdd ai soli primi 15 elementi ordinati per alleggerire la join
 
-        print(nation)
-        for i, x in enumerate(tempChart):
+        print(country)
+        for i, x in enumerate(temp_chart):
             print("{}-{}: {}, (2016 position: {})"
                   .format(i + 1,
                           x[0].split(" ; ")[1],
                           x[1][0],
                           x[1][1] + 1))
         print("-----------------------------------------------------------------------\n")
+
+    end = datetime.datetime.now()
+    print("Processing time: ", end - start)
+
+
+
+def mean_temperature(rdd, nat_cities):
+    """
+    get a list of hourly temperatures and group them by key ('country ; city ; tz'), then compute the mean
+    :param rdd: raw lines of a csv
+    :param nat_cities: list of 'country ; city ; tz' strings
+    :return: seasonal mean temperature RDD composed of tuples of the form ('country ; city ; tz', mean_temperature)
+    """
+
+    # ("country ; city ; tz", [t1,...,tn])
+    temp = rdd \
+        .flatMap(lambda l: hourly_temps(l, nat_cities)) \
+        .groupByKey()
+    # TODO: compute mean with groupByKey
+    # ("country ; city ; tz", mean temperature)
+    return temp.map(lambda t: (t[0], sum(t[1]) / len(t[1])))
+
+
+# generateTupleWithHoursAndCorrectData(line, cities, tipoChiave, val_max, val_min, dotPosition):
+def hourly_temps(line, keys):
+    """
+    Generate a list of tuples (country ; city, hourly_temperature)
+    """
+
+    hourly_temps_list = []
+    temperature = line.split(",")[1:]
+
+    for i, key in enumerate(keys):
+
+        try:
+            temp = float(temperature[i].strip())
+            if temp > Constants.MAX_TEMPERATURE or temp < Constants.MIN_TEMPERATURE:
+                print("\n\nALARM: temperature out of range\n\n")
+            t = (key, temp)
+            hourly_temps_list.append(t)
+
+        except ValueError:
+            print("error float conv")
+
+    return hourly_temps_list
+
+
+if __name__ == '__main__':
+    main()

@@ -14,16 +14,23 @@ debug = True
 
 
 def generate_state_from_city(sc):
+    """
+    Read the city coordinates file, remove the header and for each city
+    coordinates couple generate the related country and timezone in the format: 'country ; city ; timezone',
+    for example 'United States ; Portland ; America/Los_Angeles'.
+    :param sc: spark context
+    :return: a string 'country ; city ; timezone'
+    """
 
-    city_datas = sc.textFile(Constants.CITY_ATTRIBUTES_FILE)
-    header = city_datas.filter(lambda l: "Latitude" in l)
+    city_data = sc.textFile(Constants.CITY_ATTRIBUTES_FILE)
+    header = city_data.filter(lambda line: "Latitude" in line)
 
-    city_info = city_datas\
-        .subtract(header)\
-        .map(lambda line: (line.split(",")[0], line.split(",")[1:]))\
+    city_info = city_data \
+        .subtract(header) \
+        .map(lambda line: (line.split(",")[0], line.split(",")[1:])) \
         .map(lambda my_tuple: utils.locutils.country(float(my_tuple[1][0]), float(my_tuple[1][1]))
-                             + " ; " + my_tuple[0]
-                             + " ; " + utils.locutils.get_timezone(float(my_tuple[1][0]), float(my_tuple[1][1])))
+             + " ; " + my_tuple[0]
+             + " ; " + utils.locutils.get_timezone(float(my_tuple[1][0]), float(my_tuple[1][1])))
 
     city_info_d = city_info.collect()
 

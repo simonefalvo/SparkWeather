@@ -25,10 +25,11 @@ def utcoffset(lat, lng):
     tz_target = timezone(tf.certain_timezone_at(lat=target['lat'], lng=target['lng']))
 
     print("target timezone: ", tz_target)
-    # ATTENTION: tz_target could be None! handle error case
+    # TODO: tz_target could be None! handle error case
     today_target = tz_target.localize(datetime.now())
     offset = today_target.strftime('%z')[0:3]       # +/-HHMM
     return int(offset)
+
 
 def get_timezone(lat, lng):
     """
@@ -38,6 +39,7 @@ def get_timezone(lat, lng):
     tz_target = timezone(tf.certain_timezone_at(lat=target['lat'], lng=target['lng']))
     return str(tz_target)
 
+
 def convert_timezone(my_date, my_timezone):
 
     my_struct_date = datetime.strptime(my_date, "%Y-%m-%d %H:%M:%S")
@@ -45,7 +47,6 @@ def convert_timezone(my_date, my_timezone):
     timezone_date = utc_date.astimezone(pytz.timezone(my_timezone.strip()))
 
     return str(timezone_date)[0:19]
-
 
 
 if __name__ == '__main__':
