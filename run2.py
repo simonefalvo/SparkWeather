@@ -14,10 +14,10 @@ debug = True
 def compute_statistics_of_month(my_list):
 
     month_statistics = {
-        "avg": statistics.mean(my_list),
-        "max": max(my_list),
-        "min": min(my_list),
-        "std": statistics.stdev(my_list)
+        'avg': statistics.mean(my_list),
+        'max': max(my_list),
+        'min': min(my_list),
+        'std': statistics.stdev(my_list)
     }
     return month_statistics
 
@@ -65,6 +65,7 @@ def query2(sc, file_in_name, file_out_name):
     # TODO: togliere sortbykey, mi serve in fase di test per avere output ordinato
     data_month = data \
         .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[2][-10:-3], t[1]))
+
     print("seconda stampa")
     print(data_month.take(10))
     print("fine seconda stampa")
@@ -77,33 +78,26 @@ def query2(sc, file_in_name, file_out_name):
         .map(lambda t: ("query2", t))\
         .reduceByKey(lambda x, y: x + y)
     '''
-    #statistics_data.saveAsTextFile(file_out_name)
-    #(statistics_data.map(lambda x: json.dumps(x)).saveAsTextFile(file_out_name))
-
-    result = statistics_data.collect()
-    result = json.dumps(result)
 
     if debug:
+        result = json.dumps(statistics_data.collect())
         print("terza stampa")
         print(result)
 
-    statistics_data.coalesce(1).saveAsTextFile("hdfs://localhost:54310/topics/query2textfile")
-    #exit()
-
+    '''
+        Save data in HDFS
+    '''
     spark = SparkSession.builder.appName('print').getOrCreate()
     df = spark.createDataFrame(statistics_data, ['ID', 'value'])
+    df.coalesce(1).write.format("json").save("hdfs://localhost:54310/topics/nifi/query2")
 
-    df.coalesce(1).write.format("json").save("hdfs://localhost:54310/topics/query2DFtojson")
-    exit()
     '''
     df = spark.createDataFrame(statistics_data, ['ID', 'value'])
     df.write.format("com.databricks.spark.avro").save(file_out_name)
     print(df.collect())
     #installed avro e databricks
     '''
-    exit()
 
-    return result
 
 
 def main():
