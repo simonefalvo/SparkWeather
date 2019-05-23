@@ -1,9 +1,12 @@
 from pyspark import SparkContext
+from pyspark.sql import SparkSession
 import statistics
 import datetime
 import Constants
 import utils.locutils
 import time
+import json
+import os
 
 debug = True
 
@@ -39,7 +42,7 @@ def generate_state_from_city(sc):
 
 '''
     @input: Riga del file csv, 
-            lista delle citta, nel formato "Nazione ; Città"
+            lista delle citta, nel formato "Nazione ; Città; TimeZone"
             tipoChiave, specifica se nell'output si vuole solo la città (valore 1) o la nazione e la citta
     
     @output: lista di tuple del tipo (chiave, (ora, temperatura))
@@ -52,8 +55,15 @@ def generate_state_from_city(sc):
 '''
 
 
-def generate_tuple_with_hours_utc(line, cities, key_type, val_max, val_min, utc_convert):
-
+def generate_tuple_with_hours_utc(line, cities, key_type, utc_convert):
+    """
+    ....
+    :param line:
+    :param cities:
+    :param key_type:
+    :param utc_convert:
+    :return:
+    """
     my_list = []
     date = line[0:19]
     temperature = line.split(",")
@@ -62,26 +72,23 @@ def generate_tuple_with_hours_utc(line, cities, key_type, val_max, val_min, utc_
 
     for city in cities:
         if utc_convert:
-            date_offset = utils.locutils.convert_timezone(date, city.split(";")[2])
-            h = date_offset[11:13]
-            date_offset = date_offset[0:10]
+            local_datetime = utils.locutils.convert_timezone(date, city.split(";")[2])
+            h = local_datetime[11:13]
+            local_datetime = local_datetime[0:10]
         else:
             h = date[11:13]
-            date_offset = date[0:10]
+            local_datetime = date[0:10]
 
         if key_type == 1:
-            k = city+' '+date_offset
+            k = city+' '+ local_datetime
         else:  # """ probabilmente non lo usero mai """
-            k = city.split(";")[0]+' '+date_offset
+            k = city.split(";")[0] + ' ' + local_datetime
 
         try:
             temp = float(temperature[i].strip())
             # print("temperatura da dataset = " + str(temp))
-
-            if temp in range(val_min, val_max):
-                # t = (k, [(h, temp)])
-                t = (k, [temp])
-                my_list.append(t)
+            t = (k, [temp])
+            my_list.append(t)
 
             i = i + 1
 
@@ -145,7 +152,7 @@ def fillEmptyData(my_list):
 
 
 
-def query2(sc, file_in_name, val_max, val_min, file_out_name):
+def query2(sc, file_in_name, file_out_name):
 
     rdd_file_data = sc.textFile(file_in_name)
 
@@ -165,7 +172,7 @@ def query2(sc, file_in_name, val_max, val_min, file_out_name):
 
     data = rdd_file_data \
         .subtract(data_header) \
-        .flatMap(lambda line: generate_tuple_with_hours_utc(line, cites, 1, val_max, val_min, True)) \
+        .flatMap(lambda line: generate_tuple_with_hours_utc(line, cites, 1, True)) \
         .reduceByKey(lambda x, y: x+y)
     '''
                                     reduceByKey(lambda x,y: x+y ).\
@@ -194,15 +201,38 @@ def query2(sc, file_in_name, val_max, val_min, file_out_name):
 
     statistics_data = data_month\
         .reduceByKey(lambda x, y: x + y) \
-        .mapValues(compute_statistics_of_month)  # \
-        #.sortByKey()
-
-    statistics_data.saveAsTextFile(file_out_name)
+        .mapValues(compute_statistics_of_month)
+    '''\
+        .sortByKey()\
+        .map(lambda t: ("query2", t))\
+        .reduceByKey(lambda x, y: x + y)
+    '''
+    #statistics_data.saveAsTextFile(file_out_name)
+    #(statistics_data.map(lambda x: json.dumps(x)).saveAsTextFile(file_out_name))
 
     result = statistics_data.collect()
+    result = json.dumps(result)
+
     if debug:
         print("terza stampa")
         print(result)
+
+    statistics_data.coalesce(1).saveAsTextFile("hdfs://localhost:54310/topics/query2textfile")
+    #exit()
+
+    spark = SparkSession.builder.appName('print').getOrCreate()
+    df = spark.createDataFrame(statistics_data, ['ID', 'value'])
+
+    df.coalesce(1).write.format("json").save("hdfs://localhost:54310/topics/query2DFtojson")
+    exit()
+    '''
+    df = spark.createDataFrame(statistics_data, ['ID', 'value'])
+    df.write.format("com.databricks.spark.avro").save(file_out_name)
+    print(df.collect())
+    #installed avro e databricks
+    '''
+    exit()
+
 
     return result
 
@@ -215,11 +245,11 @@ def main():
 
     current_milli_time = int(round(time.time() * 1000))
     file_path = Constants.TEMPERATURE_QUERY2_OUTPUT_FILE+str(current_milli_time)+".txt"
-
+    #test
+    dir = os.path.dirname(__file__)
+    file_path = dir+"/data/OUTPUTTEST"
     result_temp = query2(sc,
                         Constants.TEMPERATURE_FILE,
-                        Constants.MAX_TEMPERATURE,
-                        Constants.MIN_TEMPERATURE,
                         file_path)
 
     del result_temp
@@ -231,8 +261,6 @@ def main():
 
     result_hum = query2(sc,
                        Constants.HUMIDITY_FILE,
-                       Constants.MAX_HUMIDITY,
-                       Constants.MIN_HUMIDITY,
                        file_path)
 
     del result_hum
@@ -242,8 +270,6 @@ def main():
 
     result_press = query2(sc,
                          Constants.PRESSURE_FILE,
-                         Constants.MAX_PRESSURE,
-                         Constants.MIN_PRESSURE,
                          file_path)
 
     del result_press
