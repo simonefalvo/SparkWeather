@@ -1,4 +1,5 @@
 from pyspark import SparkContext
+from pyspark.sql import SparkSession
 import datetime
 import re
 import Constants
@@ -138,11 +139,18 @@ def main():
         Infine li ordina per chiave (anno) e li stampa
         
     '''
-    printableResult = resultQuery.map(lambda t: (t[0][:-3], [ t[0][-2:] ])).reduceByKey(lambda a, b: a + b) \
+    result = resultQuery.map(lambda t: (t[0][:-3], [ t[0][-2:] ])).reduceByKey(lambda a, b: a + b) \
         .filter(lambda t: len(t[1]) == 3).map(lambda t: (t[0][-4:], [t[0][:-5]] )).reduceByKey(lambda a, b: a + b) \
-        .sortByKey().collect()
+        .sortByKey()
 
-    print(printableResult)
+    '''
+           Save data in HDFS
+    '''
+    spark = SparkSession.builder.appName('print').getOrCreate()
+    df = spark.createDataFrame(result, ['year', 'cities'])
+    df.coalesce(1).write.format("json").save("hdfs://localhost:54310/topics/nifi/query1")
+
+    print(result.collect())
     print(datetime.datetime.now())
 
 
