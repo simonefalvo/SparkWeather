@@ -8,6 +8,10 @@ PRESSURE_FILE = dir + "/data/pressure.csv"
 TEMPERATURE_FILE = dir + "/data/temperature_processed.csv"
 WEATHER_DESCRIPTION_FILE = dir + "/data/weather_description.csv"
 
+TEMPERATURE_FILE_PREPROCESSED = "/data/temperature_processed.csv"
+TEMPERATURE_FILE_HDFS = "hdfs://localhost:54310/topics/input_data/temperature.csv"
+
+
 HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_humidity"
 PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_pressure"
 TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_temperature"
