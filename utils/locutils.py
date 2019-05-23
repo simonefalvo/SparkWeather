@@ -40,10 +40,15 @@ def get_timezone(lat, lng):
     return str(tz_target)
 
 
-def convert_timezone(my_date, my_timezone):
-
-    my_struct_date = datetime.strptime(my_date, "%Y-%m-%d %H:%M:%S")
-    utc_date = pytz.utc.localize(my_struct_date)
+def convert_timezone(utc_date_string, my_timezone):
+    """
+    Generate locsl time zone
+    :param utc_date_string: string utc
+    :param my_timezone: local timezone
+    :return: a string of type yyyy-mm-dd hh:mm:ss
+    """
+    utc_struct_date = datetime.strptime(utc_date_string, "%Y-%m-%d %H:%M:%S")
+    utc_date = pytz.utc.localize(utc_struct_date)
     timezone_date = utc_date.astimezone(pytz.timezone(my_timezone.strip()))
 
     return str(timezone_date)[0:19]
