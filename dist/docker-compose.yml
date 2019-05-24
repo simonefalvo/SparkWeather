@@ -2,6 +2,16 @@
 version: '3'
 services:
 
+  nifi:
+    image: smvfal/pynifi:latest
+    hostname: nifi
+    container_name: nifi
+    ports:
+      - "8080:8080"
+    volumes: 
+      - ./data/nifi:/data 
+      - ../data:/rawdata
+
 #  spark-master:
 #    image: smvfal/spark:latest
 #    container_name: spark-master
@@ -109,48 +119,3 @@ services:
 #      SCHEMA_REGISTRY_HOST_NAME: schema-registry
 #      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
 
-#  hdfs-master:
-#    image: effeerre/hadoop
-#    container_name: master
-#    entrypoint: /bin/bash
-#    stdin_open: true
-#    tty: true
-#    ports:
-#      - "54310:54310"
-#      - "9870:9870"
-#    volumes: 
-#      - ./data/hdfs:/data
-#
-#  hdfs-worker1:
-#    image: effeerre/hadoop
-#    container_name: slave1
-#    stdin_open: true
-#    tty: true
-#    ports:
-#      - "9864:9864"
-#
-#  hdfs-worker2:
-#    image: effeerre/hadoop
-#    container_name: slave2
-#    stdin_open: true
-#    tty: true
-#    ports:
-#      - "9863:9864"
-#
-#  hdfs-worker3:
-#    image: effeerre/hadoop
-#    container_name: slave3
-#    stdin_open: true
-#    tty: true
-#    ports:
-#      - "9862:9864"
-
-  nifi:
-    image: smvfal/pynifi:latest
-    hostname: nifi
-    container_name: nifi
-    ports:
-      - "8080:8080"
-    volumes: 
-      - ./data/nifi:/data 
-      - ../data:/rawdata
