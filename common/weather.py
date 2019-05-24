@@ -2,7 +2,7 @@ import Constants
 import utils.locutils
 
 
-def gen_city_keys():
+def gen_city_keys(sc):
     """
     Read the city_key coordinates file, remove the header and for each city_key
     coordinates couple generate the related country and timezone in the format: 'country ; city_key ; timezone',
@@ -11,10 +11,13 @@ def gen_city_keys():
     :return: a collection of strings 'country ; city_key ; timezone'
     """
 
-    file = open(Constants.CITY_ATTRIBUTES_FILE, 'r')
+    file = Constants.CITY_ATTRIBUTES_FILE
+    rdd = sc.textFile(file)
+
+    file_data = rdd.map(lambda line: line).collect()
     start = True
     city_info_d = {}
-    for line in file:
+    for line in file_data:
         if start:
             start = False
         else:
@@ -24,8 +27,6 @@ def gen_city_keys():
             city_info_d[city] = str(utils.locutils.country(lat, lon)) \
                 + " ; " + city \
                 + " ; " + str(utils.locutils.get_timezone(lat, lon))
-
-    file.close()
     return city_info_d
 
 
