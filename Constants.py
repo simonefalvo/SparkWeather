@@ -9,6 +9,11 @@ HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2/query2_h
 PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2/query2_pressure"
 TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2/query2_temperature"
 
+HUMIDITY_QUERY2_SQL_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2sql/query2_humidity"
+PRESSURE_QUERY2_SQL_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2sql/query2_pressure"
+TEMPERATURE_QUERY2_SQL_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2sql/query2_temperature"
+
+
 QUERY1_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query1/query1"
 QUERY3_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query3/query3"
 
