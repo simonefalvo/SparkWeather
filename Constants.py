@@ -1,22 +1,16 @@
-import os
 
-dir = os.path.dirname(__file__)
+CITY_ATTRIBUTES_FILE = "hdfs://localhost:54310/topics/in/city_attributes.csv"
+HUMIDITY_FILE = "hdfs://localhost:54310/topics/in/humidity.csv"
+PRESSURE_FILE = "hdfs://localhost:54310/topics/in/pressure.csv"
+TEMPERATURE_FILE = "hdfs://localhost:54310/topics/in/temperature.csv"
+WEATHER_DESCRIPTION_FILE = "hdfs://localhost:54310/topics/in/weather_description.csv"
 
-CITY_ATTRIBUTES_FILE = dir + "/data/city_attributes.csv"
-HUMIDITY_FILE = dir + "/data/humidity.csv"
-PRESSURE_FILE = dir + "/data/pressure.csv"
-TEMPERATURE_FILE = dir + "/data/temperature_processed.csv"
-WEATHER_DESCRIPTION_FILE = dir + "/data/weather_description.csv"
+HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2_humidity"
+PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2_pressure"
+TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2_temperature"
 
-TEMPERATURE_FILE_PREPROCESSED = "/data/temperature_processed.csv"
-TEMPERATURE_FILE_HDFS = "hdfs://localhost:54310/topics/input_data/temperature.csv"
-
-
-HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_humidity"
-PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_pressure"
-TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/query2_temperature"
-QUERY1_OUTPUT_FILE = "hdfs://localhost:54310/topics/query1.json"
-
+QUERY1_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query1"
+QUERY3_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query3"
 
 
 MAX_TEMPERATURE = 330
