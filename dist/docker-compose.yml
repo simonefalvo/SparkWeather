@@ -2,31 +2,32 @@
 version: '3'
 services:
 
-  spark-master:
-    image: smvfal/spark:latest
-    container_name: spark-master
-    hostname: spark-master
-    ports:
-      - "8082:8082"
-      - "7077:7077"
-    environment:
-      SPARK_LOCAL_IP: spark-master
-      SPARK_MASTER_PORT: 7077
-      SPARK_MASTER_WEBUI_PORT: 8082
-    command: "/start-master.sh"
-    volumes:
-      - ./data/spark:/data
-
-  spark-worker:
-    image: smvfal/spark:latest
-    depends_on:
-      - spark-master
-    ports:
-      - 8082
-    environment:
-      SPARK_MASTER: spark://spark-master:7077
-      SPARK_WORKER_WEBUI_PORT: 8082
-    command: "/start-worker.sh"
+#  spark-master:
+#    image: smvfal/spark:latest
+#    container_name: spark-master
+#    hostname: spark-master
+#    ports:
+#      - "8082:8082"
+#      - "7077:7077"
+#    environment:
+#      SPARK_LOCAL_IP: spark-master
+#      SPARK_MASTER_PORT: 7077
+#      SPARK_MASTER_WEBUI_PORT: 8082
+#    command: "/start-master.sh"
+#    volumes:
+#      - ./data/spark:/data
+#      - ..:/SparkWeather
+#
+#  spark-worker:
+#    image: smvfal/spark:latest
+#    depends_on:
+#      - spark-master
+#    ports:
+#      - 8082
+#    environment:
+#      SPARK_MASTER: spark://spark-master:7077
+#      SPARK_WORKER_WEBUI_PORT: 8082
+#    command: "/start-worker.sh"
 
   zookeeper:
     image: confluentinc/cp-zookeeper:5.2.1
@@ -63,7 +64,7 @@ services:
     depends_on:
       - zookeeper
       - broker
-      - schema-registry
+#      - schema-registry
     ports:
       - "8083:8083"
     command: bash
@@ -95,18 +96,18 @@ services:
     volumes: 
       - ./data/connect:/data
 
-  schema-registry:
-    image: confluentinc/cp-schema-registry:5.2.1
-    hostname: schema-registry
-    container_name: schema-registry
-    depends_on:
-      - zookeeper
-      - broker
-    ports:
-      - "8081:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+#  schema-registry:
+#    image: confluentinc/cp-schema-registry:5.2.1
+#    hostname: schema-registry
+#    container_name: schema-registry
+#    depends_on:
+#      - zookeeper
+#      - broker
+#    ports:
+#      - "8081:8081"
+#    environment:
+#      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+#      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
 
 #  hdfs-master:
 #    image: effeerre/hadoop
