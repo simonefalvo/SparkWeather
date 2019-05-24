@@ -1,4 +1,5 @@
 from pyspark import SparkContext
+from pyspark.sql import SparkSession
 import re
 import Constants
 import common.weather as weather
@@ -6,6 +7,7 @@ import datetime
 import utils
 import statistics
 import run2
+import time
 
 def main():
 
@@ -18,7 +20,7 @@ def main():
     temp_header = raw_csv.filter(lambda l: "datetime" in l)
     raw_temp = raw_csv.subtract(temp_header)
 
-    city_keys = weather.gen_city_keys()
+    city_keys = weather.gen_city_keys(sc)
     header_position = run2.get_position(temp_header)
 
     # get countries' list of the involved cities
@@ -27,7 +29,6 @@ def main():
         country = city_key.split(" ; ")[0]
         if country not in countries:
             countries.append(country)
-    print(countries)
 
     season = raw_temp.filter(lambda l: re.search('^2017-05-31|^2017-06|^2017-07|^2017-08|^2017-09|^2017-10-1', l))
     season_regex = '^2017-0[6-9]-...1[2-5]'
@@ -57,8 +58,10 @@ def main():
     prev_temp_diff = summer_mean_temp.join(winter_mean_temp).mapValues(lambda temps: abs(temps[0] - temps[1])).cache()
     #print("2016 temperature difference per city: ", prev_temp_diff.take(10))
 
+    list_save = []
+
     for country in countries:
-        # get country's 2017 temperature differences
+        # get country's 2017 temperature differences ("country ; city", temperature)
         country_temp = temp_diff.filter(lambda value: country in value[0])
         # get country's 2017 temperature differences and sort by value in ascending order
         # producing tuples of the form ("country ; city", position)
@@ -66,17 +69,34 @@ def main():
             .sortBy(keyfunc=lambda x: x[1], ascending=False) \
             .map(lambda x: x[0]) \
             .zipWithIndex()
-        temp_chart = country_temp.join(prev_country_temp).takeOrdered(15, lambda x: -x[1][0])
+
+
+        # ("country ; city", (temp, 2016 position))
+        temp_chart_rdd = country_temp.join(prev_country_temp).sortBy(lambda x: -x[1][0]).cache()
+        list_save.append(temp_chart_rdd)
+
+        #temp_chart = temp_chart_.takeOrdered(3, lambda x: -x[1][0])
+        temp_chart_collection = temp_chart_rdd.takeOrdered(3, lambda x: -x[1][0])
         # TODO: ridurre l'rdd ai soli primi 15 elementi ordinati per alleggerire la join
 
-        print(country)
-        for i, x in enumerate(temp_chart):
+        for i, x in enumerate(temp_chart_collection):
             print("{}-{}: {}, (2016 position: {})"
                   .format(i + 1,
                           x[0].split(" ; ")[1],
                           x[1][0],
                           x[1][1] + 1))
         print("-----------------------------------------------------------------------\n")
+
+    '''
+            Save data in HDFS
+    '''
+
+    current_milli_time = int(round(time.time() * 1000))
+    path_out = Constants.QUERY3_OUTPUT_FILE + str(current_milli_time) + ".json"
+
+    spark = SparkSession.builder.appName('print').getOrCreate()
+    df = spark.createDataFrame(sc.union(list_save), ['ID', 'value'])
+    df.coalesce(1).write.format("json").save(path_out)
 
     end = datetime.datetime.now()
     print("Processing time: ", end - start)

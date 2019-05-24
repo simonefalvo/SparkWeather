@@ -1,6 +1,7 @@
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 import datetime
+import time
 import re
 import Constants
 
@@ -146,9 +147,12 @@ def main():
     '''
            Save data in HDFS
     '''
+    current_milli_time = int(round(time.time() * 1000))
+    path_out = Constants.QUERY1_OUTPUT_FILE + str(current_milli_time) + ".json"
+
     spark = SparkSession.builder.appName('print').getOrCreate()
     df = spark.createDataFrame(result, ['year', 'cities'])
-    df.coalesce(1).write.format("json").save("hdfs://localhost:54310/topics/nifi/query1")
+    df.coalesce(1).write.format("json").save(path_out)
 
     print(result.collect())
     print(datetime.datetime.now())

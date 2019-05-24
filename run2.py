@@ -6,15 +6,14 @@ import Constants
 import time
 import common.weather as weather
 import json
-import os
 
-debug = True
+debug = False
 
 
 def get_position(header):
 
     header_str = str(header.collect())
-    #rimuovo le quadre a inizio e fine stringa
+    # rimuovo le quadre a inizio e fine stringa
     header_str = header_str[1:]
     header_str = header_str[:-2]
     my_list = header_str.split(",")
@@ -28,7 +27,6 @@ def get_position(header):
         city = str(city).strip().replace("_", " ")
         my_map[city] = i
         i += 1
-    print(my_map)
     return my_map
 
 
@@ -51,7 +49,7 @@ def query2(sc, file_in_name, file_out_name):
     data_header = rdd_file_data\
         .filter(lambda l: "datetime" in l)
 
-    cites = weather.gen_city_keys()
+    cites = weather.gen_city_keys(sc)
 
     header_position = get_position(data_header)
 
@@ -63,18 +61,13 @@ def query2(sc, file_in_name, file_out_name):
         calcola rdd con elenco delle temperature (al piu 12) di ogni giorno di ogni città
         
     '''
-
+    #TODO: togliere sortByKey
     data = rdd_file_data \
         .subtract(data_header) \
         .flatMap(lambda line: weather.hourly_temps(header_position, line, cites, add_date=True, convert_utc=False)) \
         .reduceByKey(lambda x, y: x+y)\
         .sortByKey()
 
-    '''
-                                    reduceByKey(lambda x,y: x+y ).\
-                                    sortByKey()
-
-    '''
     if debug:
         print("prima stampa")
         print(data.top(20))
@@ -93,19 +86,15 @@ def query2(sc, file_in_name, file_out_name):
         .map(lambda t: (t[0].split(";")[0] + t[0].split(";")[2][-10:-3], t[1]))\
         .sortByKey()
 
-    print("seconda stampa")
-    print(data_month.top(20))
-    print("fine seconda stampa")
+    if debug:
+        print("seconda stampa")
+        print(data_month.top(20))
+        print("fine seconda stampa")
 
     statistics_data = data_month\
         .reduceByKey(lambda x, y: x + y) \
         .mapValues(compute_statistics_of_month)\
         .sortByKey()
-    '''\
-        .sortByKey()\
-        .map(lambda t: ("query2", t))\
-        .reduceByKey(lambda x, y: x + y)
-    '''
 
     if debug:
         result = json.dumps(statistics_data.collect())
@@ -117,14 +106,7 @@ def query2(sc, file_in_name, file_out_name):
     '''
     spark = SparkSession.builder.appName('print').getOrCreate()
     df = spark.createDataFrame(statistics_data, ['ID', 'value'])
-    df.coalesce(1).write.format("json").save("hdfs://localhost:54310/topics/nifi/query2")
-
-    '''
-    df = spark.createDataFrame(statistics_data, ['ID', 'value'])
-    df.write.format("com.databricks.spark.avro").save(file_out_name)
-    print(df.collect())
-    #installed avro e databricks
-    '''
+    df.coalesce(1).write.format("json").save(file_out_name)
 
 
 
@@ -135,22 +117,21 @@ def main():
     print(start)
 
     current_milli_time = int(round(time.time() * 1000))
-    file_path = Constants.TEMPERATURE_QUERY2_OUTPUT_FILE+str(current_milli_time)+".txt"
-    #test
-    dir = os.path.dirname(__file__)
-    file_path = dir+"/data/OUTPUTTEST"
 
-    query2(sc, Constants.TEMPERATURE_FILE_elisa, file_path)
-
-    current_milli_time = int(round(time.time() * 1000))
-    file_path = Constants.HUMIDITY_QUERY2_OUTPUT_FILE + str(current_milli_time) + ".txt"
-
-    query2(sc, Constants.HUMIDITY_FILE, file_path)
+    path_out = Constants.TEMPERATURE_QUERY2_OUTPUT_FILE+str(current_milli_time)+".json"
+    query2(sc,
+           Constants.TEMPERATURE_FILE,
+           path_out)
 
     current_milli_time = int(round(time.time() * 1000))
-    file_path = Constants.PRESSURE_QUERY2_OUTPUT_FILE + str(current_milli_time) + ".txt"
+    path_out = Constants.HUMIDITY_QUERY2_OUTPUT_FILE + str(current_milli_time) + ".json"
 
-    query2(sc, Constants.PRESSURE_FILE, file_path)
+    query2(sc, Constants.HUMIDITY_FILE, path_out)
+
+    current_milli_time = int(round(time.time() * 1000))
+    path_out = Constants.PRESSURE_QUERY2_OUTPUT_FILE + str(current_milli_time) + ".json"
+
+    query2(sc, Constants.PRESSURE_FILE, path_out)
 
     end = datetime.datetime.now()
     print(end)
