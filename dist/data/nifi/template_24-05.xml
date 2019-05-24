@@ -2651,7 +2651,7 @@
                         <autoTerminate>false</autoTerminate>
                         <name>success</name>
                     </relationships>
-                    <state>RUNNING</state>
+                    <state>STOPPED</state>
                     <style/>
                     <type>org.apache.nifi.processors.hadoop.FetchHDFS</type>
                 </processors>
@@ -14215,5 +14215,5 @@
             <type>org.apache.nifi.processors.standard.ExecuteStreamCommand</type>
         </processors>
     </snippet>
-    <timestamp>05/24/2019 16:36:57 CEST</timestamp>
+    <timestamp>05/24/2019 16:48:32 CEST</timestamp>
 </template>
