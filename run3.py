@@ -60,6 +60,8 @@ def main():
 
     list_save = []
 
+    current_milli_time = int(round(time.time() * 1000))
+
     for country in countries:
         # get country's 2017 temperature differences ("country ; city", temperature)
         country_temp = temp_diff.filter(lambda value: country in value[0])
@@ -73,7 +75,6 @@ def main():
 
         # ("country ; city", (temp, 2016 position))
         temp_chart_rdd = country_temp.join(prev_country_temp).sortBy(lambda x: -x[1][0]).cache()
-        list_save.append(temp_chart_rdd)
 
         #temp_chart = temp_chart_.takeOrdered(3, lambda x: -x[1][0])
         temp_chart_collection = temp_chart_rdd.takeOrdered(3, lambda x: -x[1][0])
@@ -87,16 +88,15 @@ def main():
                           x[1][1] + 1))
         print("-----------------------------------------------------------------------\n")
 
-    '''
-            Save data in HDFS
-    '''
+        '''
+                Save data in HDFS
+        '''
+        print("saving...")
+        path_out = Constants.QUERY3_OUTPUT_FILE + str(country) + str(current_milli_time) + ".json"
 
-    current_milli_time = int(round(time.time() * 1000))
-    path_out = Constants.QUERY3_OUTPUT_FILE + str(current_milli_time) + ".json"
-
-    spark = SparkSession.builder.appName('print').getOrCreate()
-    df = spark.createDataFrame(sc.union(list_save), ['ID', 'value'])
-    df.coalesce(1).write.format("json").save(path_out)
+        spark = SparkSession.builder.appName('print').getOrCreate()
+        df = spark.createDataFrame(temp_chart_rdd, ['ID', 'value'])
+        df.coalesce(1).write.format("json").save(path_out)
 
     end = datetime.datetime.now()
     print("Processing time: ", end - start)
