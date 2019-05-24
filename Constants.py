@@ -5,12 +5,12 @@ PRESSURE_FILE = "hdfs://localhost:54310/topics/in/pressure.csv"
 TEMPERATURE_FILE = "hdfs://localhost:54310/topics/in/temperature.csv"
 WEATHER_DESCRIPTION_FILE = "hdfs://localhost:54310/topics/in/weather_description.csv"
 
-HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2_humidity"
-PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2_pressure"
-TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2_temperature"
+HUMIDITY_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2/query2_humidity"
+PRESSURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2/query2_pressure"
+TEMPERATURE_QUERY2_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query2/query2_temperature"
 
-QUERY1_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query1"
-QUERY3_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query3"
+QUERY1_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query1/query1"
+QUERY3_OUTPUT_FILE = "hdfs://localhost:54310/topics/out/query3/query3"
 
 
 MAX_TEMPERATURE = 330
