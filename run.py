@@ -49,6 +49,7 @@ def evaluateDay(elementList):
     return n_k, sky_clear
     # return k, [sky_clear, sky_not_clear]
 
+
 def getRDDFromCSV(sc, nameFile):
 
     fileRDD = sc.textFile(nameFile)
