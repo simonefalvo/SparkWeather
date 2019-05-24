@@ -6,7 +6,7 @@ import datetime
 
 def mongo_put(my_dict, collection_name, db_name):
     # Create connection to MongoDB
-    client = MongoClient("mongodb://localhost:27017")
+    client = MongoClient("mongodb://mongo_server:27017")
     db = client[db_name]
     collection = db[collection_name]
 
@@ -35,8 +35,8 @@ def get_param():
         sys.stdout("Usage: collection name, db name")
         return -1
 
-    collection_name = str(sys.argv[1])
-    db_name = str(sys.argv[2])
+    db_name = str(sys.argv[1])
+    collection_name = str(sys.argv[2])
 
     return collection_name, db_name
 
