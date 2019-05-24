@@ -1,6 +1,33 @@
 ---
 version: '3'
 services:
+
+  spark-master:
+    image: smvfal/spark:latest
+    container_name: spark-master
+    hostname: spark-master
+    ports:
+      - "8082:8082"
+      - "7077:7077"
+    environment:
+      SPARK_LOCAL_IP: spark-master
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8082
+    command: "/start-master.sh"
+    volumes:
+      - ./data/spark:/data
+
+  spark-worker:
+    image: smvfal/spark:latest
+    depends_on:
+      - spark-master
+    ports:
+      - 8082
+    environment:
+      SPARK_MASTER: spark://spark-master:7077
+      SPARK_WORKER_WEBUI_PORT: 8082
+    command: "/start-worker.sh"
+
   zookeeper:
     image: confluentinc/cp-zookeeper:5.2.1
     hostname: zookeeper
@@ -36,6 +63,7 @@ services:
     depends_on:
       - zookeeper
       - broker
+      - schema-registry
     ports:
       - "8083:8083"
     command: bash
@@ -54,17 +82,15 @@ services:
       CONNECT_STATUS_STORAGE_TOPIC: connect-status
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
-#      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.storage.StringConverter
       CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
-#      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       CLASSPATH: /usr/share/java/monitoring-interceptors/monitoring-interceptors-5.2.1.jar
       CONNECT_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
       CONNECT_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
-#      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
-
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
       CONNECT_LOG4J_LOGGERS: org.apache.zookeeper=ERROR,org.I0Itec.zkclient=ERROR,org.reflections=ERROR
     volumes: 
       - ./data/connect:/data
@@ -118,12 +144,12 @@ services:
 #    ports:
 #      - "9862:9864"
 
-#  nifi:
-#    image: apache/nifi:latest
-#    hostname: nifi
-#    container_name: nifi
-#    ports:
-#      - "8080:8080"
-#    volumes: 
-#      - ./data/nifi:/data 
-#      - ../data:/rawdata
+  nifi:
+    image: smvfal/pynifi:latest
+    hostname: nifi
+    container_name: nifi
+    ports:
+      - "8080:8080"
+    volumes: 
+      - ./data/nifi:/data 
+      - ../data:/rawdata
